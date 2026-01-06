@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hospital Locator Map</title>
+
+    <!-- Leaflet CSS -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+
+        #map {
+            height: 500px;
+            width: 100%;
+        }
+
+        /* Tooltip base */
+        .leaflet-tooltip {
+            border-radius: 6px;
+            padding: 6px 8px;
+            font-size: 13px;
+            font-weight: 500;
+            color: white;
+            border: none;
+        }
+
+        /* Tooltip colors */
+        .tooltip-green {
+            background-color: #2e7d32;
+        }
+
+        .tooltip-red {
+            background-color: #c62828;
+        }
+
+        /* Legend */
+        .legend {
+            margin: 10px 0;
+            padding: 8px 12px;
+            background: #f5f5f5;
+            border-radius: 6px;
+            font-size: 14px;
+            width: fit-content;
+        }
+
+        /* Side list */
+        #hospital-list {
+            width: 280px;
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 10px;
+            background: #fafafa;
+        }
+
+        .list-item {
+            padding: 8px;
+            margin-bottom: 6px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .list-green {
+            background-color: #e8f5e9;
+            border-left: 5px solid #2e7d32;
+        }
+
+        .list-red {
+            background-color: #fdecea;
+            border-left: 5px solid #c62828;
+        }
+
+        .list-item:hover {
+            background-color: #e0e0e0;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>🏥 Nearest Hospital Locator</h2>
+    <button onclick="findHospital()">Find Nearest Hospital</button>
+
+    <!-- Legend -->
+    <div class="legend">
+        <b>Legend:</b><br>
+        🟢 <span style="color:#2e7d32;font-weight:600;">Nearest 5 hospitals</span><br>
+        🔴 <span style="color:#c62828;font-weight:600;">Hospitals ranked 6–10</span>
+    </div>
+
+    <!-- Layout -->
+    <div style="display:flex; gap:15px;">
+        
+        <!-- Side List -->
+        <div id="hospital-list">
+            <b>Top 10 Nearest Hospitals</b>
+            <hr>
+            <div id="list-content"></div>
+        </div>
+
+        <!-- Map -->
+        <div id="map"></div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        let map, userMarker;
+        let hospitalMarkers = [];
+
+        function findHospital() {
+            navigator.geolocation.getCurrentPosition(position => {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+
+                fetch("/find-hospital", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ lat, lon })
+                })
+                .then(res => res.json())
+                .then(data => showMap(lat, lon, data));
+            });
+        }
+
+        function showMap(userLat, userLon, hospitals) {
+            if (!map) {
+                map = L.map("map").setView([userLat, userLon], 14);
+
+                L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                    attribution: "© OpenStreetMap contributors"
+                }).addTo(map);
+            }
+
+            // Clear old markers
+            hospitalMarkers.forEach(m => map.removeLayer(m));
+            hospitalMarkers = [];
+
+            if (userMarker) map.removeLayer(userMarker);
+
+            // User marker
+            userMarker = L.marker([userLat, userLon])
+                .addTo(map)
+                .bindPopup("📍 You are here");
+
+            // Icons
+            const greenIcon = new L.Icon({
+                iconUrl: "https://maps.google.com/mapfiles/ms/icons/green-dot.png",
+                iconSize: [32, 32],
+                iconAnchor: [16, 32]
+            });
+
+            const redIcon = new L.Icon({
+                iconUrl: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
+                iconSize: [32, 32],
+                iconAnchor: [16, 32]
+            });
+
+            // Clear side list
+            const listDiv = document.getElementById("list-content");
+            listDiv.innerHTML = "";
+
+            hospitals.forEach((hospital, index) => {
+                const icon = index < 5 ? greenIcon : redIcon;
+
+                const marker = L.marker(
+                    [hospital.lat, hospital.lon],
+                    { icon: icon }
+                ).addTo(map);
+
+                // Labels only for top 10
+                if (index < 10) {
+                    const tooltipClass = index < 5 ? "tooltip-green" : "tooltip-red";
+
+                    marker.bindTooltip(
+                        `🏥 ${hospital.name}<br>📏 ${hospital.distance} km`,
+                        {
+                            permanent: true,
+                            direction: "top",
+                            offset: [0, -10],
+                            className: tooltipClass
+                        }
+                    );
+
+                    // Side list item
+                    const item = document.createElement("div");
+                    item.className = `list-item ${index < 5 ? "list-green" : "list-red"}`;
+                    item.innerHTML = `
+                        <b>${index + 1}. ${hospital.name}</b><br>
+                        📏 ${hospital.distance} km
+                    `;
+
+                    item.onclick = () => {
+                        map.setView([hospital.lat, hospital.lon], 16);
+                        marker.openTooltip();
+                    };
+
+                    listDiv.appendChild(item);
+                }
+
+                hospitalMarkers.push(marker);
+            });
+        }
+    </script>
+</body>
+</html>
