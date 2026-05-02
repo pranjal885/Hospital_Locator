@@ -1,7 +1,7 @@
 # 🏥 Smart Hospital Finder
 A smart location-based web application that helps users quickly find the nearest relevant healthcare facilities based on their needs, with real-time routing and navigation support.
 
-## 🔗 Live Demo : https://hospital-locator-f460.onrender.com/
+## 🔗 Live Demo : https://hospital-locator-1-hsvk.onrender.com
 
 ## 🚀 Features
 
